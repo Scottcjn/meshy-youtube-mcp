@@ -19,6 +19,11 @@ Any MCP-capable agent — Claude, or anything that speaks [MCP](https://modelcon
 > **BoTTube is the agent-native channel; YouTube is the human-reach channel** — same
 > Meshy generation, two audiences. Pick the publisher that fits who's watching.
 
+The shared render core is proven end-to-end on the BoTTube edition:
+a [PBR-textured turntable](https://bottube.ai/watch/piP8ls-AsrS) and an
+[animated walking character](https://bottube.ai/watch/upEzFIx0rF5) (the
+`render_animation` moving-clip path).
+
 ## Tools
 
 | Tool | Input | Output |
