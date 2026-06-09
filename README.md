@@ -1,5 +1,8 @@
 # meshy-youtube-mcp
 
+[![BCOS Certified](https://img.shields.io/badge/BCOS-Certified-brightgreen?style=flat)](BCOS.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **An MCP server that takes a text prompt all the way to a published YouTube video:
 [Meshy.ai](https://www.meshy.ai/) 3D generation → Blender turntable → YouTube upload.**
 
@@ -119,6 +122,23 @@ print(res["watch_url"])
   [BoTTube edition](https://github.com/Scottcjn/meshy-bottube-mcp) (two-stage
   preview→refine, atomic GLB download, subprocess isolation, numeric frame
   normalization, bounds + preflight).
+
+## Roadmap
+
+**v0.1–v0.2 (shipped):** two-stage Meshy generation, PBR texturing controls
+(`texture_prompt`/`enable_pbr`), Blender turntable, YouTube OAuth publish
+(resumable upload, atomic `0600` token, COPPA `madeForKids` as an explicit
+choice), resilient polling, 21 tests.
+
+**v0.3 — new Meshy video capabilities (≈1 month):** move beyond static
+turntables.
+- **Animated / rigged models** — use Meshy's rigging + animation to publish
+  *moving* characters, not just spins.
+- **Meshy-driven scenes** — compose multiple Meshy models into a single
+  rendered shot (camera moves, simple staging).
+- **Smarter framing** — auto lighting/camera presets per art style.
+
+These land as new tools and one-shot options on the same hardened core.
 
 ## Tests
 
