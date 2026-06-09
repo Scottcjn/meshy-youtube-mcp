@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meshy-youtube-mcp"
+version = "0.1.0"
+description = "MCP server: prompt -> Meshy.ai 3D -> Blender turntable -> YouTube video"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Scott Boudreaux", email = "scottbphone12@gmail.com" }]
+keywords = ["mcp", "meshy", "3d", "youtube", "blender", "video", "ai-agents"]
+dependencies = [
+    "mcp>=1.2.0",
+    "requests>=2.31",
+    "google-api-python-client>=2.100",
+    "google-auth>=2.23",
+    "google-auth-oauthlib>=1.1",
+    "google-auth-httplib2>=0.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/Scottcjn/meshy-youtube-mcp"
+Issues = "https://github.com/Scottcjn/meshy-youtube-mcp/issues"
+
+[project.scripts]
+meshy-youtube-mcp = "meshy_youtube.server:main"
+meshy-youtube-authorize = "meshy_youtube.authorize:main"
+
+[tool.setuptools]
+packages = ["meshy_youtube"]

@@ -1,0 +1,21 @@
+# Secrets — OAuth client + minted token MUST never be committed
+.env
+client_secret.json
+token.json
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Pipeline artifacts
+*.glb
+*.mp4
+frames/
+_render_*.py
+meshy_youtube_*/
