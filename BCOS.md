@@ -1,6 +1,6 @@
 # BCOS — Blockchain Certified Open Source
 
-[![BCOS Certified](https://img.shields.io/badge/BCOS-Certified-brightgreen?style=flat)](https://github.com/Scottcjn/Rustchain)
+[![BCOS Ready](https://img.shields.io/badge/BCOS-Ready-yellowgreen?style=flat)](https://github.com/Scottcjn/Rustchain)
 
 ## What is BCOS?
 
@@ -30,15 +30,14 @@ front-and-center. This repo is designed to pass:
 | **Declared dependencies** | All in `requirements.txt` / `pyproject.toml` (`mcp`, `requests`, `google-*`) |
 | **Build reproducible** | Deterministic; 21 offline unit tests, ruff-clean |
 | **License clear** | MIT (`LICENSE`) |
-| **Human reviewed** | See below |
+| **Human reviewed** | Human-directed + adversarially reviewed (see below); formal line-by-line maintainer sign-off is the last step to full **Certified** |
 
 ## Review record
 
 | Field | Value |
 |-------|-------|
-| **Status** | BCOS Certified |
-| **Reviewed by** | Scott Boudreaux ([@Scottcjn](https://github.com/Scottcjn)) |
-| **Organization** | Elyan Labs |
+| **Status** | **BCOS-Ready** — meets all technical criteria above; human-directed and adversarially AI-reviewed. Full **Certified** status follows the maintainer's line-by-line read + on-chain attestation. |
+| **Maintained & directed by** | Scott Boudreaux ([@Scottcjn](https://github.com/Scottcjn)), Elyan Labs |
 | **Adversarial review** | Multi-model review (Codex security audit + Grok regression) before publish, with extra focus on OAuth token handling, redirect/COPPA/encoding safety — see commit history |
 | **Chain** | [RustChain](https://github.com/Scottcjn/Rustchain) (Proof-of-Antiquity) |
 

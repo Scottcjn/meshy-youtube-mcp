@@ -1,6 +1,6 @@
 # meshy-youtube-mcp
 
-[![BCOS Certified](https://img.shields.io/badge/BCOS-Certified-brightgreen?style=flat)](BCOS.md)
+[![BCOS Ready](https://img.shields.io/badge/BCOS-Ready-yellowgreen?style=flat)](BCOS.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **An MCP server that takes a text prompt all the way to a published YouTube video:
