@@ -23,12 +23,18 @@ Any MCP-capable agent — Claude, or anything that speaks [MCP](https://modelcon
 
 | Tool | Input | Output |
 |------|-------|--------|
-| `generate_3d_model` | prompt, art_style | `.glb` path + Meshy task ids (preview→refine) |
-| `get_meshy_task_status` | task_id | status / `.glb` path on success |
-| `render_turntable` | `.glb` | PNG frames (needs Blender) |
-| `frames_to_video` | frames dir | `.mp4` |
+| `generate_3d_model` | prompt, art_style | `.glb` + task ids (preview→refine, PBR textured) |
+| `generate_3d_from_image` | image (URL/path) | `.glb` from a single image |
+| `generate_3d_from_images` | 1–4 images | `.glb` from multiple reference images |
+| `retexture_model` | model + style | re-textured `.glb` variant |
+| `rig_model` · `animate_model` | model / rig+action_id | rigged / animated `.glb` |
+| `get_meshy_task_status` | task_id | status / `.glb` on success |
+| `render_turntable` · `frames_to_video` | `.glb` / frames | PNG frames / `.mp4` |
 | `upload_to_youtube` | `.mp4`, title | `video_id`, `watch_url` (OAuth) |
-| `meshy_to_youtube` | prompt, title | **one-shot full pipeline** → `watch_url` |
+| **`meshy_to_youtube`** | prompt | **one-shot:** text → 3D → turntable → published |
+| **`image_to_youtube`** | image | **one-shot:** image → 3D → turntable → published |
+| **`retexture_to_youtube`** | model + style | **one-shot:** re-texture → turntable → published |
+| **`animate_to_youtube`** | model, action_id | **one-shot:** rig → animate → render motion → published |
 
 ## Requirements
 
@@ -130,15 +136,15 @@ print(res["watch_url"])
 (resumable upload, atomic `0600` token, COPPA `madeForKids` as an explicit
 choice), resilient polling, 21 tests.
 
-**v0.3 — new Meshy video capabilities (≈1 month):** move beyond static
-turntables.
-- **Animated / rigged models** — use Meshy's rigging + animation to publish
-  *moving* characters, not just spins.
-- **Meshy-driven scenes** — compose multiple Meshy models into a single
-  rendered shot (camera moves, simple staging).
-- **Smarter framing** — auto lighting/camera presets per art style.
+**v0.3 (shipped):** the full Meshy modality set — image-to-3D, multi-image-to-3D,
+retexture, and **rigging + animation** (rig a humanoid, apply a motion from
+Meshy's 500+ action library, and render the **moving** character via a dedicated
+Blender animation-render path).
 
-These land as new tools and one-shot options on the same hardened core.
+> Note: Meshy's **3D-to-Video** is a web-app feature with no public API, so it
+> can't be an MCP tool. The rig→animate→render chain delivers the same outcome.
+
+**Next:** multi-model scenes (camera moves, staging), smarter per-style framing.
 
 ## Tests
 

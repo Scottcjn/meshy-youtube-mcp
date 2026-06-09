@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import textwrap
 import uuid
+from typing import Optional
 
 DEFAULT_FRAMES = 180        # 6s at 30fps
 DEFAULT_RESOLUTION = 720    # square
@@ -25,6 +26,10 @@ MIN_RESOLUTION, MAX_RESOLUTION = 16, 1920
 
 # Wall-clock cap so a wedged Blender can't monopolize the host forever.
 BLENDER_TIMEOUT = 1800
+
+# Cap on rendered animation frames (a Meshy clip is usually 1–4s; this bounds a
+# pathologically long action so one render can't fill the disk).
+MAX_ANIM_FRAMES = 600
 
 
 class TurntableError(RuntimeError):
@@ -93,22 +98,26 @@ def render(glb_path: str, output_dir: str, frames: int = DEFAULT_FRAMES,
     # Force an even dimension: H.264 + yuv420p (the ffmpeg stage) requires even
     # width/height, and an odd value would only fail *after* the billed render.
     resolution -= resolution % 2
-    # Validate inputs (cheap) before checking for the Blender binary.
+    glb_path, output_dir = _prep_render_dir(glb_path, output_dir)
+    _run_blender(_blender_script(glb_path, output_dir, frames, resolution),
+                 output_dir)
+    frame_count = _normalize_frame_sequence(output_dir, frames)
+    return {"frames_dir": output_dir, "frame_count": frame_count}
+
+
+def _prep_render_dir(glb_path: str, output_dir: str):
+    """Shared pre-render checks: GLB exists, Blender present, output dir is empty
+    of PNGs (we never delete a caller's images)."""
     glb_path = os.path.abspath(glb_path)
     output_dir = os.path.abspath(output_dir)
     if not os.path.isfile(glb_path):
         raise TurntableError(f"GLB model not found: {glb_path}")
     if shutil.which("blender") is None:
         raise TurntableError(
-            "Blender not found in PATH. Install Blender to render turntables "
+            "Blender not found in PATH. Install Blender to render "
             "(https://www.blender.org/download/)."
         )
     os.makedirs(output_dir, exist_ok=True)
-
-    # Refuse to render into a directory that already holds PNGs: we must NOT
-    # delete a caller's existing images, and mixing leftovers into the frame
-    # sequence would corrupt the output. Server tools always pass a fresh
-    # workdir; library callers should pass an empty directory.
     existing = [f for f in os.listdir(output_dir) if f.endswith(".png")]
     if existing:
         raise TurntableError(
@@ -116,11 +125,14 @@ def render(glb_path: str, output_dir: str, frames: int = DEFAULT_FRAMES,
             f"{output_dir}. Pass an empty directory so existing images are "
             f"left untouched."
         )
+    return glb_path, output_dir
 
+
+def _run_blender(script_text: str, output_dir: str) -> None:
+    """Write a Blender-Python script to a unique file and run it headless."""
     script_path = os.path.join(output_dir, f"_render_{uuid.uuid4().hex}.py")
     with open(script_path, "w") as fh:
-        fh.write(_blender_script(glb_path, output_dir, frames, resolution))
-
+        fh.write(script_text)
     try:
         result = subprocess.run(
             ["blender", "--background", "--python", script_path],
@@ -136,11 +148,94 @@ def render(glb_path: str, output_dir: str, frames: int = DEFAULT_FRAMES,
     finally:
         if os.path.exists(script_path):
             os.remove(script_path)
-
     if result.returncode != 0:
         raise TurntableError(f"Blender render failed:\n{result.stderr[-2000:]}")
 
-    frame_count = _normalize_frame_sequence(output_dir, frames)
+
+def _animation_script(model_path: str, output_dir: str, resolution: int,
+                      max_frames: int, fallback_frames: int) -> str:
+    """Blender script: import an animated GLB, frame the model with a fixed
+    camera, set the scene range to the imported animation, and render it."""
+    return textwrap.dedent(f"""\
+        import bpy, mathutils
+
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        bpy.ops.import_scene.gltf(filepath={model_path!r})
+
+        # Animation frame range from the imported actions (capped). Init wide
+        # so an action that starts after frame 1 isn't padded with stale frames.
+        fstart, fend = 10**9, -10**9
+        for a in bpy.data.actions:
+            fr = a.frame_range
+            fstart = min(fstart, int(fr[0]))
+            fend = max(fend, int(fr[1]))
+        if fend < fstart:
+            fstart, fend = 0, {fallback_frames} - 1
+        if fend - fstart + 1 > {max_frames}:
+            fend = fstart + {max_frames} - 1
+
+        # World-space bounding box of all meshes, to frame the character.
+        mins = [1e9, 1e9, 1e9]
+        maxs = [-1e9, -1e9, -1e9]
+        for obj in bpy.context.scene.objects:
+            if obj.type == 'MESH':
+                for corner in obj.bound_box:
+                    wv = obj.matrix_world @ mathutils.Vector(corner)
+                    for i in range(3):
+                        mins[i] = min(mins[i], wv[i])
+                        maxs[i] = max(maxs[i], wv[i])
+        if mins[0] > maxs[0]:
+            mins, maxs = [-1, -1, 0], [1, 1, 2]
+        center = mathutils.Vector(((mins[0]+maxs[0])/2,
+                                    (mins[1]+maxs[1])/2, (mins[2]+maxs[2])/2))
+        size = max(maxs[0]-mins[0], maxs[1]-mins[1], maxs[2]-mins[2]) or 1.0
+
+        cam = bpy.data.cameras.new("Camera")
+        cam_obj = bpy.data.objects.new("Camera", cam)
+        bpy.context.scene.collection.objects.link(cam_obj)
+        bpy.context.scene.camera = cam_obj
+        dist = size * 2.2
+        cam_obj.location = (center[0], center[1] - dist, center[2] + size * 0.25)
+        aim = center - cam_obj.location
+        cam_obj.rotation_euler = aim.to_track_quat('-Z', 'Y').to_euler()
+
+        light = bpy.data.lights.new("Light", type="SUN")
+        light.energy = 3
+        light_obj = bpy.data.objects.new("Light", light)
+        light_obj.location = (center[0] + size, center[1] - size,
+                              center[2] + size * 2)
+        bpy.context.scene.collection.objects.link(light_obj)
+
+        scene = bpy.context.scene
+        scene.render.resolution_x = {resolution}
+        scene.render.resolution_y = {resolution}
+        scene.frame_start = fstart
+        scene.frame_end = fend
+        scene.render.image_settings.file_format = "PNG"
+        scene.render.filepath = {(output_dir + os.sep)!r}
+
+        bpy.ops.render.render(animation=True)
+    """)
+
+
+def render_animation(glb_path: str, output_dir: str,
+                     resolution: int = DEFAULT_RESOLUTION,
+                     fallback_frames: int = 120) -> dict:
+    """Render an ANIMATED GLB (from Meshy rig+animate) as a video — the model
+    performs its motion in front of a fixed, auto-framed camera. The frame count
+    is the animation's own length (capped at ``MAX_ANIM_FRAMES``).
+
+    Returns {frames_dir, frame_count}."""
+    if not MIN_RESOLUTION <= resolution <= MAX_RESOLUTION:
+        raise TurntableError(
+            f"resolution must be in [{MIN_RESOLUTION}, {MAX_RESOLUTION}], "
+            f"got {resolution}")
+    resolution -= resolution % 2
+    glb_path, output_dir = _prep_render_dir(glb_path, output_dir)
+    _run_blender(
+        _animation_script(glb_path, output_dir, resolution, MAX_ANIM_FRAMES,
+                          fallback_frames), output_dir)
+    frame_count = _normalize_frame_sequence(output_dir, None)  # dynamic length
     return {"frames_dir": output_dir, "frame_count": frame_count}
 
 
@@ -150,19 +245,22 @@ def _frame_num(name: str) -> int:
     return int(digits) if digits else -1
 
 
-def _normalize_frame_sequence(output_dir: str, expected_count: int) -> int:
+def _normalize_frame_sequence(output_dir: str,
+                              expected_count: Optional[int]) -> int:
     """Rename the PNGs in ``output_dir`` to a contiguous 0000.png, 0001.png …
     sequence in NUMERIC frame order, so ffmpeg's "%04d.png" pattern always
     matches regardless of Blender's native padding/start-number.
 
-    Raises ``TurntableError`` on no frames, a count mismatch (partial render),
-    or any filesystem error during the rename.
+    ``expected_count`` enforces an exact frame count (turntables know theirs);
+    pass ``None`` when the count is dynamic (an animation's length).
+
+    Raises ``TurntableError`` on no frames, a count mismatch, or a rename error.
     """
     pngs = sorted((f for f in os.listdir(output_dir) if f.endswith(".png")),
                   key=_frame_num)
     if not pngs:
         raise TurntableError(f"no PNG frames were produced in {output_dir}")
-    if len(pngs) != expected_count:
+    if expected_count is not None and len(pngs) != expected_count:
         raise TurntableError(
             f"expected {expected_count} frames but found {len(pngs)} "
             f"(likely a partial/interrupted render)"
