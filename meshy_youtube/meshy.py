@@ -31,6 +31,8 @@ ART_STYLES = ("realistic", "cartoon", "low-poly", "sculpture")
 _HTTP_TIMEOUT = 60
 _DOWNLOAD_TIMEOUT = 300
 _MAX_GLB_BYTES = 200 * 1024 * 1024  # 200 MB sanity cap on a downloaded model
+# Consecutive transient poll failures tolerated before abandoning a wait.
+_MAX_POLL_FAILURES = 4
 
 # Progress callback: (stage, state, percent) -> None
 ProgressFn = Callable[[str, str, int], None]
@@ -84,11 +86,20 @@ def create_preview_task(prompt: str, art_style: str = "realistic",
     })
 
 
-def create_refine_task(preview_task_id: str) -> str:
-    """Create a refine (texturing) task for a completed preview task."""
+def create_refine_task(preview_task_id: str, texture_prompt: Optional[str] = None,
+                       enable_pbr: bool = True) -> str:
+    """Create a refine (texturing) task for a completed preview task.
+
+    The refine stage is what TEXTURES the base mesh. ``enable_pbr`` produces
+    physically-based textures (default True); ``texture_prompt`` gives the
+    texturing stage extra guidance (e.g. "weathered bronze, mossy")."""
     if not preview_task_id:
         raise MeshyError("preview_task_id is required to refine")
-    return _create({"mode": "refine", "preview_task_id": preview_task_id})
+    payload = {"mode": "refine", "preview_task_id": preview_task_id,
+               "enable_pbr": bool(enable_pbr)}
+    if texture_prompt:
+        payload["texture_prompt"] = texture_prompt
+    return _create(payload)
 
 
 def get_task(task_id: str) -> dict:
@@ -113,10 +124,27 @@ def get_task(task_id: str) -> dict:
 def wait_for_task(task_id: str, poll_interval: int = 15, timeout: int = 600,
                   stage: str = "task",
                   on_progress: Optional[ProgressFn] = None) -> dict:
-    """Poll until the task SUCCEEDED, raising MeshyError on FAILED/timeout."""
+    """Poll until the task SUCCEEDED, raising MeshyError on FAILED/timeout.
+
+    A single transient network blip on one poll must not throw away a billed
+    generation, so up to ``_MAX_POLL_FAILURES`` consecutive status-fetch errors
+    are tolerated (with a backoff sleep) before giving up. A genuine task
+    failure is a status *state*, not an exception, so it is never swallowed.
+    """
     start = time.monotonic()
+    consecutive_failures = 0
     while time.monotonic() - start < timeout:
-        status = get_task(task_id)
+        try:
+            status = get_task(task_id)
+            consecutive_failures = 0
+        except MeshyError as exc:
+            consecutive_failures += 1
+            if consecutive_failures > _MAX_POLL_FAILURES:
+                raise MeshyError(
+                    f"Meshy {stage} task {task_id}: {_MAX_POLL_FAILURES} "
+                    f"consecutive poll failures; last error: {exc}") from exc
+            time.sleep(poll_interval)
+            continue
         state = status.get("status", "UNKNOWN")
         if on_progress:
             on_progress(stage, state, int(status.get("progress", 0) or 0))
@@ -184,10 +212,13 @@ def download_glb(status: dict, output_path: str) -> str:
 
 
 def generate(prompt: str, output_path: str, art_style: str = "realistic",
-             should_remesh: bool = True, poll_interval: int = 15,
+             should_remesh: bool = True, texture_prompt: Optional[str] = None,
+             enable_pbr: bool = True, poll_interval: int = 15,
              timeout: int = 600,
              on_progress: Optional[ProgressFn] = None) -> dict:
-    """Full two-stage generation: preview → refine → download GLB.
+    """Full two-stage generation: preview (base mesh) → refine (texturing) →
+    download GLB. The refine stage textures the model; ``enable_pbr`` and
+    ``texture_prompt`` control it.
 
     ``timeout`` applies to each polling stage independently. Returns metadata
     including both task ids and the local ``glb_path``.
@@ -197,7 +228,8 @@ def generate(prompt: str, output_path: str, art_style: str = "realistic",
     wait_for_task(preview_id, poll_interval=poll_interval, timeout=timeout,
                   stage="preview", on_progress=on_progress)
 
-    refine_id = create_refine_task(preview_id)
+    refine_id = create_refine_task(preview_id, texture_prompt=texture_prompt,
+                                   enable_pbr=enable_pbr)
     refine_status = wait_for_task(refine_id, poll_interval=poll_interval,
                                   timeout=timeout, stage="refine",
                                   on_progress=on_progress)
@@ -217,4 +249,6 @@ def generate(prompt: str, output_path: str, art_style: str = "realistic",
         "model_urls": refine_status.get("model_urls", {}),
         "art_style": art_style,
         "prompt": prompt,
+        "texture_prompt": texture_prompt,
+        "enable_pbr": enable_pbr,
     }

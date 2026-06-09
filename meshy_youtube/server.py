@@ -100,15 +100,20 @@ def _tags_list(tags: str) -> list:
 
 @mcp.tool()
 def generate_3d_model(prompt: str, art_style: str = "realistic",
-                      should_remesh: bool = True, timeout: int = 600) -> dict:
+                      should_remesh: bool = True, texture_prompt: str = "",
+                      enable_pbr: bool = True, timeout: int = 600) -> dict:
     """Generate a 3D model from a text prompt via Meshy.ai (preview → refine).
-    Blocks until ready; returns the local .glb path and Meshy task ids."""
+    The refine stage textures the model: enable_pbr (default True) for PBR
+    textures, texture_prompt for extra guidance. Blocks until ready; returns the
+    local .glb path and Meshy task ids."""
     if timeout < 1:
         raise ValueError(f"timeout must be >= 1, got {timeout}")
     _preflight(need_meshy=True)
     out = os.path.join(_workdir(), "model.glb")
     return meshy.generate(prompt, out, art_style=art_style,
-                          should_remesh=should_remesh, timeout=timeout)
+                          should_remesh=should_remesh,
+                          texture_prompt=texture_prompt or None,
+                          enable_pbr=enable_pbr, timeout=timeout)
 
 
 @mcp.tool()
@@ -165,6 +170,7 @@ def meshy_to_youtube(prompt: str, title: str, description: str = "",
                      privacy: str = "unlisted", category_id: str = "22",
                      made_for_kids: bool = False,
                      art_style: str = "realistic", should_remesh: bool = True,
+                     texture_prompt: str = "", enable_pbr: bool = True,
                      frames: int = 180, resolution: int = 1080, fps: int = 30,
                      duration: int = 6, timeout: int = 600) -> dict:
     """One-shot: prompt -> Meshy 3D -> turntable -> video -> YouTube upload.
@@ -210,7 +216,8 @@ def meshy_to_youtube(prompt: str, title: str, description: str = "",
         stage = "meshy"
         glb = meshy.generate(prompt, os.path.join(work, "model.glb"),
                              art_style=art_style, should_remesh=should_remesh,
-                             timeout=timeout)
+                             texture_prompt=texture_prompt or None,
+                             enable_pbr=enable_pbr, timeout=timeout)
         steps["glb_path"] = glb["glb_path"]
 
         stage = "turntable"
