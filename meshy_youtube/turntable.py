@@ -174,6 +174,11 @@ def _animation_script(model_path: str, output_dir: str, resolution: int,
         if fend - fstart + 1 > {max_frames}:
             fend = fstart + {max_frames} - 1
 
+        # Record the expected frame count so the host can detect a truncated
+        # (crashed/interrupted) render instead of publishing a partial clip.
+        with open({(output_dir + os.sep + "_expected_frames.txt")!r}, "w") as _ef:
+            _ef.write(str(fend - fstart + 1))
+
         # World-space bounding box of all meshes, to frame the character.
         mins = [1e9, 1e9, 1e9]
         maxs = [-1e9, -1e9, -1e9]
@@ -235,7 +240,21 @@ def render_animation(glb_path: str, output_dir: str,
     _run_blender(
         _animation_script(glb_path, output_dir, resolution, MAX_ANIM_FRAMES,
                           fallback_frames), output_dir)
-    frame_count = _normalize_frame_sequence(output_dir, None)  # dynamic length
+    # The Blender script writes the count it intended to render; use it to catch
+    # a truncated render (falls back to lenient if the marker is missing).
+    expected = None
+    marker = os.path.join(output_dir, "_expected_frames.txt")
+    if os.path.isfile(marker):
+        try:
+            expected = int(open(marker).read().strip())
+        except (ValueError, OSError):
+            expected = None
+        finally:
+            try:
+                os.remove(marker)
+            except OSError:
+                pass
+    frame_count = _normalize_frame_sequence(output_dir, expected)
     return {"frames_dir": output_dir, "frame_count": frame_count}
 
 

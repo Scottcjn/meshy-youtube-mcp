@@ -449,14 +449,15 @@ def rig_model(input_task_id: str = "", model_url: str = "",
 def animate_model(rig_task_id: str, action_id: int, fps: int = 30,
                   timeout: int = 600) -> dict:
     """Apply a motion to a rigged model -> animated .glb. action_id is from
-    Meshy's library (e.g. 0=Idle, 1=Walking, 4=Attack, 22=Dancing)."""
+    Meshy's library (e.g. 0=Idle, 1=Walking, 4=Attack, 22=Dancing).
+    fps must be one Meshy supports: 24, 25, 30, or 60."""
+    if fps not in (24, 25, 30, 60):
+        raise ValueError(f"fps must be one of 24, 25, 30, 60; got {fps}")
     if timeout < 1:
         raise ValueError(f"timeout must be >= 1, got {timeout}")
     _preflight(need_meshy=True)
     out = os.path.join(_workdir(), "anim.glb")
-    return meshy.animate(rig_task_id, action_id, out,
-                         fps=fps if fps in (24, 25, 30, 60) else None,
-                         timeout=timeout)
+    return meshy.animate(rig_task_id, action_id, out, fps=fps, timeout=timeout)
 
 
 @mcp.tool()
@@ -479,8 +480,9 @@ def animate_to_youtube(action_id: int, title: str, input_task_id: str = "",
         if not turntable.MIN_RESOLUTION <= resolution <= turntable.MAX_RESOLUTION:
             raise ValueError(f"resolution must be in [{turntable.MIN_RESOLUTION}, "
                              f"{turntable.MAX_RESOLUTION}], got {resolution}")
-        if fps < 1:
-            raise ValueError(f"fps must be >= 1, got {fps}")
+        if fps not in (24, 25, 30, 60):
+            # encode fps + duration math must match what Meshy produces.
+            raise ValueError(f"fps must be one of 24, 25, 30, 60; got {fps}")
         if privacy not in youtube.VALID_PRIVACY:
             raise ValueError(f"privacy must be one of {youtube.VALID_PRIVACY}")
         if not title or not title.strip():
@@ -501,8 +503,7 @@ def animate_to_youtube(action_id: int, title: str, input_task_id: str = "",
         steps["rig_task_id"] = rigged["rig_task_id"]
         stage = "animation"
         anim = meshy.animate(rigged["rig_task_id"], action_id,
-                             os.path.join(work, "anim.glb"),
-                             fps=fps if fps in (24, 25, 30, 60) else None,
+                             os.path.join(work, "anim.glb"), fps=fps,
                              timeout=timeout)
         steps["glb_path"] = anim["glb_path"]
         stage = "render"

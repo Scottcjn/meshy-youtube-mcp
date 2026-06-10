@@ -65,9 +65,24 @@ class TestImageInputs(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_mime_from_bytes_not_extension(self):
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as fh:
+            fh.write(b"\xff\xd8\xff\xe0realjpegbody")  # JPEG magic
+            path = fh.name
+        try:
+            self.assertTrue(meshy.to_image_source(path).startswith(
+                "data:image/jpeg;base64,"))
+        finally:
+            os.unlink(path)
+
     def test_endpoint_allowlist_blocks_foreign_host(self):
         with self.assertRaises(meshy.MeshyError):
             meshy.get_task("validtask", endpoint="https://evil.example.com/x")
+
+    def test_animate_model_rejects_unsupported_fps(self):
+        from meshy_youtube import server
+        with self.assertRaises(ValueError):
+            server.animate_model("rigtask", 1, fps=29)
 
     def test_missing_file_rejected(self):
         with self.assertRaises(meshy.MeshyError):

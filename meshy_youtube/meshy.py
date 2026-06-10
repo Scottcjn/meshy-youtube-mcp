@@ -11,7 +11,6 @@ because refine requires a completed ``preview_task_id``.)
 from __future__ import annotations
 
 import base64
-import mimetypes
 import os
 import re
 import tempfile
@@ -279,20 +278,24 @@ def generate(prompt: str, output_path: str, art_style: str = "realistic",
 
 # --- image inputs ---------------------------------------------------------
 
-_IMAGE_MIME_FALLBACK = "image/png"
 _MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MB cap on a base64-inlined local image
 
 
-def _looks_like_image(head: bytes) -> bool:
-    """True if the leading bytes match a common image format — a guardrail so a
-    local non-image file (e.g. a secret) can't be base64-inlined and uploaded."""
-    return (
-        head.startswith(b"\x89PNG\r\n\x1a\n")           # PNG
-        or head.startswith(b"\xff\xd8\xff")             # JPEG
-        or head[:6] in (b"GIF87a", b"GIF89a")           # GIF
-        or head.startswith(b"BM")                       # BMP
-        or (head[:4] == b"RIFF" and head[8:12] == b"WEBP")  # WEBP
-    )
+def _detect_image_mime(head: bytes) -> Optional[str]:
+    """MIME type from the leading bytes (magic), or None if it isn't a known
+    image — both a guardrail (a non-image local file can't be inlined) and the
+    source of truth for the data-URI type (so a JPEG named .png isn't mislabeled)."""
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if head.startswith(b"BM"):
+        return "image/bmp"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 def to_image_source(image: str) -> str:
@@ -315,9 +318,9 @@ def to_image_source(image: str) -> str:
             f"image is {size} bytes, over the {_MAX_IMAGE_BYTES}-byte inline cap")
     with open(path, "rb") as fh:
         data = fh.read()
-    if not _looks_like_image(data[:16]):
+    mime = _detect_image_mime(data[:16])
+    if mime is None:
         raise MeshyError(f"file does not look like an image (bad magic): {image}")
-    mime = mimetypes.guess_type(path)[0] or _IMAGE_MIME_FALLBACK
     b64 = base64.b64encode(data).decode("ascii")
     return f"data:{mime};base64,{b64}"
 
