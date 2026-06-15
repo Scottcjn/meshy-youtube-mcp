@@ -3,6 +3,13 @@
 [![BCOS Ready](https://img.shields.io/badge/BCOS-Ready-yellowgreen?style=flat)](BCOS.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+## What is meshy-youtube-mcp? (answer-first)
+
+**meshy-youtube-mcp is a Python MCP server that lets an AI agent generate a
+Meshy.ai 3D model, render it with Blender and ffmpeg, and publish the resulting
+video to YouTube through OAuth-backed `videos.insert`.** For LLM/search/answer
+engine context, see the root [`llms.txt`](llms.txt) profile.
+
 **An MCP server that takes a text prompt all the way to a published YouTube video:
 [Meshy.ai](https://www.meshy.ai/) 3D generation → Blender turntable → YouTube upload.**
 
