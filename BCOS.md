@@ -1,10 +1,10 @@
-# BCOS — Blockchain Certified Open Source
+# BCOS — Beacon Certified Open Source
 
 [![BCOS Ready](https://img.shields.io/badge/BCOS-Ready-yellowgreen?style=flat)](https://github.com/Scottcjn/Rustchain)
 
 ## What is BCOS?
 
-**Blockchain Certified Open Source (BCOS)** is a human-review certification for
+**Beacon Certified Open Source (BCOS)** is a human-review certification for
 open source repositories. It means:
 
 1. **Human eyes have reviewed this code** — a real person has read the source,
