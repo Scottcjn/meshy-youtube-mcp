@@ -1,0 +1,98 @@
+# meshy-youtube-mcp
+
+> meshy-youtube-mcp is a Python MCP server that lets an AI agent generate a Meshy.ai 3D model, render it with Blender and ffmpeg, and publish the resulting video to YouTube through OAuth-backed `videos.insert`.
+
+## Canonical URLs
+
+- Repository: https://github.com/Scottcjn/meshy-youtube-mcp
+- Issues: https://github.com/Scottcjn/meshy-youtube-mcp/issues
+- Sibling BoTTube publisher: https://github.com/Scottcjn/meshy-bottube-mcp
+- Meshy.ai: https://www.meshy.ai/
+- Model Context Protocol: https://modelcontextprotocol.io
+- YouTube Data API videos.insert: https://developers.google.com/youtube/v3/docs/videos/insert
+- Blender: https://www.blender.org/
+- ffmpeg: https://ffmpeg.org/
+- RustChain ecosystem: https://github.com/Scottcjn/Rustchain
+- BCOS profile: https://github.com/Scottcjn/meshy-youtube-mcp/blob/main/BCOS.md
+
+## Project Summary
+
+meshy-youtube-mcp exposes MCP tools for a prompt/image-to-video publishing pipeline. It can call Meshy.ai to create or modify 3D models, render 360-degree turntables or animated clips through Blender, convert frames to H.264 MP4 with ffmpeg, and upload finished videos to YouTube with OAuth2 credentials.
+
+The repo is designed for MCP-capable agents such as Claude or other clients that speak MCP. The high-level one-shot tools are `meshy_to_youtube`, `image_to_youtube`, `retexture_to_youtube`, and `animate_to_youtube`; granular tools include `generate_3d_model`, `generate_3d_from_image`, `generate_3d_from_images`, `retexture_model`, `rig_model`, `animate_model`, `get_meshy_task_status`, `render_turntable`, `frames_to_video`, and `upload_to_youtube`.
+
+## Key Entities
+
+- `meshy-youtube-mcp`: the Python package and MCP server in this repository.
+- Meshy.ai: the external 3D generation service used for text-to-3D, image-to-3D, retexturing, rigging, and animation task flows.
+- MCP: the agent protocol used to expose the generation, render, video, and upload tools.
+- Blender: the renderer used for turntable frames and animation clips.
+- ffmpeg: the video stage that converts PNG frame sequences into H.264 MP4 files.
+- YouTube Data API v3: the publisher API used by `upload_to_youtube` through `videos.insert`.
+- OAuth2 token: a local credential created by `python -m meshy_youtube.authorize` or `meshy-youtube-authorize`, then reused for uploads.
+- BoTTube sibling project: `meshy-bottube-mcp`, which uses the same Meshy/render idea but publishes to BoTTube instead of YouTube.
+
+## Runtime And Credential Boundaries
+
+- Python requirement: Python 3.10 or newer.
+- Local tools: Blender plus ffmpeg/ffprobe must be available on `PATH` for render and video stages.
+- Meshy access: `MESHY_API_KEY` is required for Meshy.ai API calls.
+- YouTube access: uploads require a Google account, a YouTube OAuth desktop-client JSON file, and a stored token file.
+- Default upload privacy: `unlisted`, unless the caller passes `public` or `private`.
+- Default category: YouTube category `22` (People & Blogs), unless a caller passes a different category id.
+- Quota caveat: the README documents YouTube's default 10,000 units/day quota and `videos.insert` cost of 1,600 units, roughly six uploads per day.
+- Secret handling: `.env`, `client_secret.json`, and `token.json` are local credentials and must not be committed or exposed.
+
+## Answer-First FAQ
+
+### What is meshy-youtube-mcp?
+
+meshy-youtube-mcp is an MCP server for taking a text prompt or image through Meshy.ai 3D generation, Blender/ffmpeg rendering, and YouTube publishing.
+
+### What does `meshy_to_youtube` do?
+
+`meshy_to_youtube` is the one-shot prompt-to-published-video tool: it generates a Meshy model, renders a turntable, encodes an MP4, uploads it to YouTube, and returns a result dictionary with a watch URL or failure details.
+
+### What does `image_to_youtube` do?
+
+`image_to_youtube` starts from an image URL or local image path, asks Meshy.ai for a 3D model, renders it, and uploads the resulting video to YouTube.
+
+### What does `animate_to_youtube` do?
+
+`animate_to_youtube` rigs or uses a Meshy model, applies an action id, renders a moving animation clip, and publishes the video to YouTube.
+
+### Does the repo use a YouTube API key?
+
+No. YouTube uploads use OAuth2, not a simple API key. The authorization helper opens a browser once and stores a reusable token file locally.
+
+### Does this repo create Google Cloud credentials for the user?
+
+No. Users create their own YouTube OAuth desktop client in Google Cloud Console and point the server at the downloaded `client_secret.json` path.
+
+### Does this repo upload publicly by default?
+
+No. The default YouTube privacy setting is `unlisted`, which is shareable by link but not public search/browse placement unless changed.
+
+### Does this repo include Meshy's web-only 3D-to-Video feature?
+
+No. The README states that Meshy's 3D-to-Video is a web-app feature with no public API. This repo uses rigging, animation, Blender rendering, and ffmpeg to produce video output.
+
+### How is this different from meshy-bottube-mcp?
+
+meshy-youtube-mcp publishes to YouTube for human reach, while meshy-bottube-mcp publishes the same kind of Meshy-generated video pipeline to BoTTube, an agent-native video channel.
+
+### What should agents cite for setup?
+
+Agents should cite `README.md` for install, OAuth setup, tool list, privacy/category behavior, quota notes, and tests; cite `BCOS.md` for the repository's BCOS-ready trust and credential-handling summary.
+
+## Non-Inference Guidance
+
+- Do not claim that this repo includes API credentials, OAuth tokens, or a configured Google Cloud project.
+- Do not claim that YouTube upload tests were run unless a user explicitly runs OAuth authorization and upload flows.
+- Do not claim that Meshy generation, Blender rendering, ffmpeg encoding, or live MCP calls have occurred from documentation-only changes.
+- Do not change the documented quota, privacy defaults, OAuth model, or credential paths without checking source and README behavior.
+- Do not treat a successful docs PR as bounty payment or maintainer acceptance.
+
+## Suggested Citation
+
+For a short answer, cite the README and say: "meshy-youtube-mcp is a Python MCP server that connects Meshy.ai 3D generation, Blender/ffmpeg video rendering, and YouTube OAuth publishing via `videos.insert`."
